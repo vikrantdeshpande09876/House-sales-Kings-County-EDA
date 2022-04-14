@@ -9,16 +9,13 @@ output: html_document
   # INTRODUCTION
   In this project, we look at a dataset of home selling-prices in King County, Washington, between May 2014 and May 2015. The dataset contains 21,613 homes and 21 descriptive features. We will build a multiple regression model with the following variables: y is the outcome variable, and there are two explanatory variables:
 
-1. A numerical explanatory variable x1: sqft living, which refers to the size of a house in square feet of living space. It is worth noting that 1 square foot equals 0.09 square meters.
-
-2. A categorical explanatory variable x2: housing condition, a five-level categorical variable with 1 indicating "poor" and 5 indicating "outstanding."
-
-3.  a. Check if the relationship can be fitted by a linear model and explain any differences.
-    b. Analyze the trends of life expectancy over time for individual continents and respective countries.
-    c. Check if any other factors affect the house-price apart from the Square Footage, Condition, Bathrooms,and Grade.
+    a. Analyze the relationships between features of houses and house-prices, for example- `sqft living`, refers to the square feet of living space, and `housing condition` is a five-level rating with 1 indicating "poor" and 5 indicating "outstanding.".
+    b. Check if any other factors affect the house-price apart from the Square Footage, Condition, Bathrooms,and Grade.
+    c. Identify if the relationship between features and home-price can be fitted by a linear model and explain any differences.
 
 
 
+require(sf)
 require(rio)
 require(tidyverse)
 require(broom)
@@ -147,9 +144,36 @@ house_prices %>%
   geom_jitter(aes(color=house_condition), size=2, alpha=0.5) +
   geom_smooth(method='lm', se=FALSE, size=1, alpha=0.5, color='green') +
   facet_wrap(~house_condition) +
-  labs(title="House prices", y="Transformed price", x="Transformed size") +
+  labs(title="House prices faceted by Condition", y="Transformed price", x="Transformed size") +
   theme_bw()
 
 
 
 
+house_prices %>%
+  mutate(house_grade=as.factor(grade)) %>%
+  ggplot(mapping=aes(x=log10_size, y=log10_price)) +
+  geom_jitter(aes(color=house_grade), size=2, alpha=0.5) +
+  geom_smooth(method='lm', se=FALSE, size=1, alpha=0.5, color='green') +
+  facet_wrap(~house_grade) +
+  labs(title="House prices faceted by Grade", y="Transformed price", x="Transformed size") +
+  theme_bw()
+
+
+
+
+
+
+my_sf <- house_prices %>%
+  st_as_sf(coords=c('long','lat')) %>%
+  st_set_crs(4326)
+
+my_sf %>%
+  ggplot() +
+  geom_sf(aes(color=log10_price)) +
+  theme_bw() + 
+  theme(panel.background = element_rect(fill = "aliceblue"),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        panel.grid = element_line(color = "white", size = 0.8)) +
+  coord_sf()
