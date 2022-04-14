@@ -13,6 +13,10 @@ output: html_document
 
 2. A categorical explanatory variable x2: housing condition, a five-level categorical variable with 1 indicating "poor" and 5 indicating "outstanding."
 
+3.  a. Check if the relationship can be fitted by a linear model and explain any differences.
+    b. Analyze the trends of life expectancy over time for individual continents and respective countries.
+    c. Check if any other factors affect the house-price apart from the Square Footage, Condition, Bathrooms,and Grade.
+
 
 
 require(rio)
@@ -30,6 +34,18 @@ house_prices <- import('kc_house_data.csv')
 glimpse(house_prices)
 colnames(house_prices)
 
+# DUPLICATE HOUSES IDENTIFIED: Resold 2 times?
+house_prices %>%
+  group_by(id) %>%
+  summarize(cnt=n(), min_prices=min(price), max_price=max(price)) %>%
+  filter(cnt>1) %>%
+  View()
+
+# REMOVING DIRTY DATA: HOUSES WITH 0 BEDROOMS AND 0 BATHROOMS, 1 HOUSE WITH 33 BEDROOMS BUT SMALL AREA
+house_prices <- house_prices %>%
+  filter((bedrooms!=0) & (bathrooms!=0)) %>%
+  filter(bedrooms!=33)
+
 
 house_prices %>%
   select(price, sqft_living, condition) %>%
@@ -46,7 +62,7 @@ NUMERIC_COLS <- house_prices %>%
   lapply(is.numeric) %>%
   unlist() %>%
   names() %>%
-  setdiff(c('id', 'date', 'condition', 'yr_built', 'grade', 'zipcode', 'lat', 'long', 'yr_renovated', 'view', 'waterfront'))
+  setdiff(c('id', 'date', 'yr_built', 'zipcode', 'view', 'yr_renovated', 'waterfront'))
 
 house_prices %>%
   select(NUMERIC_COLS) %>%
@@ -94,10 +110,10 @@ house_prices <- house_prices %>%
 
 house_prices %>% 
   select(price=price) %>%
-  mutate(type='Raw data') %>%
+  mutate(type='I. Raw Data') %>%
   union_all(house_prices %>% 
               select(price=log10_price) %>%
-              mutate(type='After Transformation') 
+              mutate(type='II. Transformed Data') 
         ) %>%
   ggplot(mapping=aes(x=price, fill=type)) +
   geom_histogram(alpha=0.5) +
@@ -108,10 +124,10 @@ house_prices %>%
 
 house_prices %>% 
   select(size=sqft_living) %>%
-  mutate(type='Raw data') %>%
+  mutate(type='I. Raw Data') %>%
   union_all(house_prices %>% 
               select(size=log10_size) %>%
-              mutate(type='After Transformation')
+              mutate(type='II. Transformed Data')
   ) %>%
   ggplot(mapping=aes(x=size, fill=type)) +
   geom_histogram(alpha=0.5) +
@@ -133,6 +149,7 @@ house_prices %>%
   facet_wrap(~house_condition) +
   labs(title="House prices", y="Transformed price", x="Transformed size") +
   theme_bw()
+
 
 
 
