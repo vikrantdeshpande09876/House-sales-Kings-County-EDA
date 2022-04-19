@@ -23,10 +23,10 @@ require(gridExtra)
 require(skimr)
 require(corrplot)
 require(ggmap)
+require(ggmosaic)
 
 
-
-house_prices <- import('C:\\Users\\vikra\\OneDrive\\Desktop\\Vikrant\\GIT_Repos\\House-sales-Kings-County-EDA\\Codebase\\kc_house_data.csv')
+house_prices <- import('kc_house_data.csv')
 glimpse(house_prices)
 colnames(house_prices)
 
@@ -121,10 +121,10 @@ house_prices %>%
     cat_price=ifelse(log10_price<=13, '0', ifelse(log10_price<=14, '1', '2'))
   ) %>%
   ggplot() +
-  geom_mosaic(aes(product(bathroom, bedroom), fill=bathroom)) +
+  geom_mosaic(aes(x=product(bathroom), fill=bedroom)) +
   labs(
     title='Mosaic Plot for Bedrooms vs Bathrooms',
-    subtitle='Most have 1-3 bedrooms and 1-3 bathrooms',
+    subtitle='Most have 2 bedrooms and 2 bathrooms',
     y='Bathrooms', x='Bedrooms'
     )
 
