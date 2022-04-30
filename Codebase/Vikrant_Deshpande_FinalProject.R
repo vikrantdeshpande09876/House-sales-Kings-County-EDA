@@ -24,6 +24,8 @@ require(skimr)
 require(corrplot)
 require(ggmap)
 require(ggmosaic)
+require(leaps)
+require(plot.matrix)
 
 
 house_prices <- import('kc_house_data.csv')
@@ -63,14 +65,28 @@ ggplot(house_prices, aes(x=sqft_living)) +
   labs(x='living space (square feet)', title='House size')
 
 
-# Barplot of condition:
+# Histogram of sqft_living15:
+ggplot(house_prices, aes(x=log10(sqft_living15))) +
+  geom_histogram(color='white') +
+  labs(x='living space (square feet)', title='Neighboring 15 house-sizes')
+
+
+# Barplot of bedrooms:
 ggplot(house_prices, aes(x=bedrooms)) +
   geom_bar() +
-  labs(x='condition', title='House condition')
+  labs(x='Bedrooms', title='Number of bedrooms in house')
+
+
+# Barplot of bathrooms:
+ggplot(house_prices, aes(x=bathrooms)) +
+  geom_bar() +
+  labs(x='bathrooms', title='HouseNumber of bathrooms in house')
 
 
 
-
+scale_down_values <- function(x){
+  return ((x-min(x))/(max(x)-min(x)))
+}
 
 
 
@@ -78,7 +94,9 @@ ggplot(house_prices, aes(x=bedrooms)) +
 house_prices <- house_prices %>%
   mutate(
     log10_price=log(price),
-    log10_size=log(sqft_living)
+    log10_size=log(sqft_living),
+    log10_neighbour_sizes=log(sqft_living15),
+    scaled_lat=scale_down_values(house_prices$lat)
   )
 
 
@@ -136,7 +154,8 @@ NUMERIC_COLS <- house_prices %>%
   lapply(is.numeric) %>%
   unlist() %>%
   names() %>%
-  setdiff(c('id', 'date', 'yr_built', 'zipcode', 'view', 'yr_renovated', 'waterfront', 'price', 'sqft_living'))
+  setdiff(c('id', 'date', 'yr_built', 'zipcode', 'view', 'yr_renovated', 'waterfront', 'price', 'sqft_living', 'sqft_living15', 'lat')) %>%
+  sort()
 
 house_prices %>%
   dplyr::select(NUMERIC_COLS) %>%
@@ -148,7 +167,13 @@ house_prices %>%
   )
 
 
-
+# POTENTIAL MULTICOLLINEARITY IN FEATURES
+# bedrooms <-> bathrooms
+# bathrooms <-> log10_size
+# log10_sqft_living15 <-> grade
+# log10_sqft_living15 <-> sqft_above
+# log10_sqft_living15 <-> log10_size
+# 
 
 
 
@@ -243,7 +268,10 @@ house_prices %>%
 
 
 # CREATING A LINEAR REGRESSIION MODEL AND PERFORMING ANOVA TEST FOR EVAL
-raw_model <- lm(data=house_prices, formula=log10_price ~ (log10_size+grade+bathrooms+bedrooms)^2)
+raw_model <- lm(
+  data=house_prices, 
+  formula=log10_price ~ (log10_size+grade+bathrooms+bedrooms+scaled_lat)^2
+  )
 
 
 summary(raw_model)
@@ -260,8 +288,8 @@ model_coefs[-1, ] %>%
 
 
 model <- lm(data=house_prices, formula=log10_price ~ 
-              (log10_size+grade+bathrooms+bedrooms)+
-              (log10_size*bathrooms + log10_size*bedrooms))
+              (log10_size+grade+bathrooms+bedrooms+scaled_lat)+
+              (log10_size*bathrooms + log10_size*scaled_lat + bedrooms*scaled_lat))
 model_coefs <- tidy(model, conf.int=TRUE)
 model_coefs[-1, ] %>%
   ggplot(aes(x=estimate, y=term, xmin=conf.low, xmax=conf.high)) +
@@ -277,6 +305,61 @@ model_coefs[-1, ] %>%
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+plot_forward_selection <- function(data, model_formula){
+  forward_selection_models <- regsubsets(data=data, x=model_formula)
+  features_selected <- summary(forward_selection_models)$which
+  features_selected[features_selected==T] = 1
+  features_selected %>%
+    plot(
+      col=c('red', 'green'), mar=c(0,0,1,0),
+      axis.col=list(side=1, las=2), 
+      main='Forward selection of Features \n(Chosen ones in green)',
+      xlab='', ylab='Steps (Regression Models)'
+    )
+  return (forward_selection_models) 
+}
+
+
+
+
+forward_selection_metrics <- function(model_summaries){
+  cp_metric_changes <- summary(model_summaries)$cp
+  colnames <- c('cp_metric', 'features_chosen')
+  cp_metric_changes_df <- create_new_df(colnames)
+  cp_metric_changes_df <- rbind(cp_metric_changes_df, cbind(cp_metric_changes, 1:length(cp_metric_changes)))
+  colnames(cp_metric_changes_df) <- colnames
+  
+  cp_metric_changes_df %>%
+    ggplot() +
+    geom_bar(mapping=aes(x=features_chosen, y=cp_metric, fill=cp_metric), stat='identity') +
+    coord_flip() +
+    scale_x_reverse() +
+    labs(title='Reducing CP Metric indicates better fits', x='CP value', y='Number of Features chosen') +
+    scale_fill_continuous(type='gradient') +
+    theme_bw()
+}
+
+
+forward_selection_models <- plot_forward_selection(data=house_prices, model_formula=model$terms)
+forward_selection_metrics(forward_selection_models)
+  
+
+
+summary(model)
+
+
+
 augment(model, type.residuals='pearson') %>%
   ggplot(aes(x=.fitted, y=.resid)) +
   geom_point(alpha=0.2, color='green') +
@@ -285,6 +368,8 @@ augment(model, type.residuals='pearson') %>%
     title='Residual plot for Linear model',
     subtitle=paste0(length(model$coefficients)-1,' features'),
     x='Fitted values', y='Residuals'
-    ) +
+  ) +
   scale_color_gradient('Prices', low='lightgreen', high='darkgreen') +
   theme_bw()
+
+
