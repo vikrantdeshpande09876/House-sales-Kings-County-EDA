@@ -227,6 +227,21 @@ house_prices %>%
 
 
 
+house_prices %>%
+  mutate(scaled_latitude=cut(house_prices$scaled_lat, breaks=5)) %>%
+  ggplot(mapping=aes(x=log10_size, y=log10_price)) +
+  geom_jitter(aes(color=scaled_latitude), size=2, alpha=0.5) +
+  geom_smooth(method='lm', se=FALSE, size=1, alpha=0.5, color='green') +
+  facet_wrap(~scaled_latitude) +
+  labs(
+    title='House prices faceted by Latitude',
+    subtitle='Some interesting trends observed',
+    y='Transformed price', x='Transformed size'
+  ) +
+  theme_bw()
+
+
+
 
 house_prices %>%
   mutate(house_bathrooms=as.factor(bathrooms)) %>%
@@ -240,6 +255,22 @@ house_prices %>%
     y='Transformed price', x='Transformed size'
   ) +
   theme_bw()
+
+
+
+house_prices %>%
+  mutate(scaled_latitude=scaled_lat) %>%
+  ggplot(mapping=aes(x=scaled_latitude, y=log10_price)) +
+  geom_jitter(aes(color=scaled_latitude), size=2, alpha=0.5) +
+  geom_smooth(method='lm', se=FALSE, size=1, alpha=0.5, color='green') +
+  facet_wrap(~bedrooms) +
+  labs(
+    title='House prices faceted by Bedrooms',
+    subtitle='Some interesting trends observed',
+    y='Transformed price', x='Latitude'
+  ) +
+  theme_bw()
+
 
 
 # CHECK IF LOCATION PLAYS A ROLE IN DETERMINING PRICES
@@ -267,41 +298,34 @@ house_prices %>%
   names
 
 
-# CREATING A LINEAR REGRESSIION MODEL AND PERFORMING ANOVA TEST FOR EVAL
-raw_model <- lm(
-  data=house_prices, 
-  formula=log10_price ~ (log10_size+grade+bathrooms+bedrooms+scaled_lat)^2
+# CREATING A LINEAR REGRESSIION MODEL
+raw_model <- lm(data=house_prices, formula=log10_price ~ 
+                  (log10_size+grade+bathrooms+bedrooms+scaled_lat)^2
   )
-
-
 summary(raw_model)
 
 
-model_coefs <- tidy(raw_model, conf.int=TRUE)
-model_coefs[-1, ] %>%
-  ggplot(aes(x=estimate, y=term, xmin=conf.low, xmax=conf.high)) +
-  geom_point(size=2) +
-  geom_errorbarh(size=1) +
-  geom_vline(xintercept=0, size=1) +
-  theme_bw() +
-  labs(title='Linear Model coefficient estimates', subtitle='All interactions between predictors considered', x='Estimate', y='Predictor variable')
+plot_model_coefficients <- function(model, subtitle){
+  model_coefs <- tidy(model, conf.int=TRUE)
+  model_coefs[-1, ] %>%
+    ggplot(aes(x=estimate, y=term, xmin=conf.low, xmax=conf.high)) +
+    geom_point(size=2) +
+    geom_errorbarh(size=1) +
+    geom_vline(xintercept=0, size=1) +
+    theme_bw() +
+    labs(title='Linear Model coefficient estimates', 
+         subtitle=subtitle, x='Estimate', y='Predictor variable')
+}
 
 
 model <- lm(data=house_prices, formula=log10_price ~ 
               (log10_size+grade+bathrooms+bedrooms+scaled_lat)+
-              (log10_size*bathrooms + log10_size*scaled_lat + bedrooms*scaled_lat))
-model_coefs <- tidy(model, conf.int=TRUE)
-model_coefs[-1, ] %>%
-  ggplot(aes(x=estimate, y=term, xmin=conf.low, xmax=conf.high)) +
-  geom_point(size=2) +
-  geom_errorbarh(size=1) +
-  geom_vline(xintercept=0, size=1) +
-  theme_bw() +
-  labs(
-    title='Linear Model coefficient estimates',
-    subtitle='Only important interactions between predictors considered',
-    x='Estimate', y='Predictor variable'
-    )
+              (log10_size*grade + log10_size*bedrooms + log10_size*bathrooms))
+summary(model)
+
+
+plot_model_coefficients(raw_model, 'All interactions between predictors considered')
+plot_model_coefficients(model, 'Only important interactions that we explored earlier are chosen')
 
 
 
@@ -311,6 +335,15 @@ model_coefs[-1, ] %>%
 
 
 
+create_new_df <- function(colnames){
+  tryCatch({
+    data.frame(matrix(ncol=length(colnames), nrow=0, dimnames=list(NULL,colnames)))
+  },
+  error=function(e){
+    cat('\nSomething went wrong while creating a new Dataframe for:',colnames)
+    print(e)
+  })
+}
 
 
 
@@ -323,7 +356,7 @@ plot_forward_selection <- function(data, model_formula){
   features_selected %>%
     plot(
       col=c('red', 'green'), mar=c(0,0,1,0),
-      axis.col=list(side=1, las=2), 
+      axis.col=list(side=1, las=1), 
       main='Forward selection of Features \n(Chosen ones in green)',
       xlab='', ylab='Steps (Regression Models)'
     )
@@ -353,10 +386,6 @@ forward_selection_metrics <- function(model_summaries){
 
 forward_selection_models <- plot_forward_selection(data=house_prices, model_formula=model$terms)
 forward_selection_metrics(forward_selection_models)
-  
-
-
-summary(model)
 
 
 
