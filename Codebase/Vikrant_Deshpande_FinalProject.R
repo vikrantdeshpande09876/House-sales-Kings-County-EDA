@@ -90,6 +90,25 @@ scale_down_values <- function(x){
 
 
 
+house_prices %>% 
+  dplyr::select(metric=sqft_living) %>%
+  mutate(Features='House Size') %>%
+  union_all(house_prices %>% 
+              dplyr::select(metric=price) %>%
+              mutate(Features='Price')
+  ) %>%
+  ggplot(mapping=aes(x=metric, fill=Features)) +
+  geom_boxplot(size=0.6, alpha=0.5) +
+  facet_wrap(~Features, scales='free') +
+  coord_flip() +
+  labs(title='Boxplots for Sizes and Prices', x='Value', y='Count') +
+  theme_bw()
+
+
+
+
+
+
 # Univariate plots show right skewed distribution, so performing Box-cox log transformation.
 house_prices <- house_prices %>%
   mutate(
@@ -388,6 +407,8 @@ forward_selection_models <- plot_forward_selection(data=house_prices, model_form
 forward_selection_metrics(forward_selection_models)
 
 
+model_summary <- summary(model)
+r_squared <- round(model_summary$r.squared, 4)
 
 augment(model, type.residuals='pearson') %>%
   ggplot(aes(x=.fitted, y=.resid)) +
@@ -395,7 +416,7 @@ augment(model, type.residuals='pearson') %>%
   geom_smooth(method='lm', size=1, alpha=0.6) +
   labs(
     title='Residual plot for Linear model',
-    subtitle=paste0(length(model$coefficients)-1,' features'),
+    subtitle=paste0(length(model$coefficients)-1,' features. R-squared=', r_squared),
     x='Fitted values', y='Residuals'
   ) +
   scale_color_gradient('Prices', low='lightgreen', high='darkgreen') +
